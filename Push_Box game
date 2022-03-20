@@ -1,0 +1,212 @@
+#include<stdlib.h>
+#include<iostream>
+#include<graphics.h>
+#include<string.h>
+#include<conio.h>
+#include<MMsystem.h>
+#pragma comment(lib,"winmm.lib")
+
+#define IS_VAILD(pos)  pos.x >= 0 && pos.x < LINE && pos. y >= 0 && pos.y< COLUMN
+#define RATIO 54
+
+#define LINE 9
+#define COLUMN 12
+
+#define SCREEN_WIDTH  960
+#define SCREEN_HEIGHT 541
+
+#define START_X 140
+#define START_Y 30
+
+#define KEY_UP(ch)    (ch == 'w') ||(ch == 'W') ||(ch== 72)
+#define KEY_LEFT(ch)  (ch == 'a') ||(ch == 'A') ||(ch== 75)
+#define KEY_RIGHT(ch) (ch == 'd') ||(ch == 'D') ||(ch== 77)
+#define KEY_DOWN(ch)  (ch == 's') ||(ch == 'S') ||(ch== 80)
+#define KEY_QUIT(ch)  (ch == 'q') ||(ch == 'Q')
+
+struct POS {
+	// 人在的行和列
+	int x;
+	int y;
+};
+struct POS man;
+
+enum PROPS {
+	WALL,   //墙
+	FLOOR,	//地板
+	BOX_DES,// 箱子的目的地
+	MAN,     // 人
+	BOX,	// 箱子
+	HIT,	// 箱子命中目标
+	ALL
+};
+
+enum DIRECTION {
+	UP,
+	DOWN,
+	LEFT,
+	RIGTH
+};
+
+typedef enum PROPS        PROPS;
+typedef enum DIRECTION   DIRECTION;
+typedef struct POS       POS;
+
+int map[LINE][COLUMN] = {
+{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+{ 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0 },
+{ 0, 1, 4, 1, 0, 2, 1, 0, 2, 1, 0, 0 },
+{ 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0 },
+{ 0, 1, 0, 2, 0, 1, 1, 4, 1, 1, 1, 0 },
+{ 0, 1, 1, 1, 0, 3, 1, 1, 1, 4, 1, 0 },
+{ 0, 1, 2, 1, 1, 4, 1, 1, 1, 1, 1, 0 },
+{ 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0 },
+{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+};
+IMAGE images[6];
+
+IMAGE bg_img;
+IMAGE vbg_img;
+IMAGE sbg_img;
+
+bool ISGameOver() {
+	for (int i = 0; i < LINE; i++) {
+		for (int j = 0; j < COLUMN;j++) {
+			if (map[i][j] == BOX_DES) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+void GameOverScene(IMAGE *bg) {
+
+	putimage(0, 0, bg);
+
+
+}
+void ChangeMap(POS *postion,PROPS object) {
+	map[postion->x][postion->y] = object;
+	putimage(START_X + (* postion).y * RATIO, START_Y + (*postion).x * RATIO, &images[object]);
+}
+
+void gemeControl(DIRECTION direct) {
+
+	struct POS next_pos = man;
+	struct POS next_next_pos = man;
+	switch (direct) {
+	case UP:
+		next_pos.x--;
+		next_next_pos.x -= 2;
+		break;
+	case DOWN:
+		next_pos.x++;
+		next_next_pos.x += 2;
+		break;
+	case LEFT:
+		next_pos.y--;
+		next_next_pos.y -= 2;
+		break;
+	case RIGTH:
+		next_pos.y++;
+		next_next_pos.y += 2;
+		break;
+	}
+	if (IS_VAILD(next_pos) && map[next_pos.x][next_pos.y] == FLOOR) {
+		//人前进
+		ChangeMap(&next_pos, MAN);
+		ChangeMap(&man, FLOOR);
+		man = next_pos;
+	}else if (IS_VAILD(next_next_pos) && map[next_pos.x][next_pos.y] == BOX) {
+		//两种情况，箱子前面是地板或者是箱子目的地
+		if (IS_VAILD(next_next_pos) && map[next_next_pos.x][next_next_pos.y] == FLOOR) {
+			ChangeMap(&next_next_pos, BOX);
+			ChangeMap(&next_pos, MAN);
+			ChangeMap(&man, FLOOR);
+			man = next_pos;
+		}
+		else if ((IS_VAILD(next_pos) && map[next_next_pos.x][next_next_pos.y] == BOX_DES)) {
+			ChangeMap(&next_next_pos, HIT);
+			ChangeMap(&next_pos, MAN);
+			ChangeMap(&man, FLOOR);
+			man = next_pos;
+		}
+	}
+}
+
+void StartGame() {
+	//游戏环节
+	bool quit = false;
+	do {
+		if (_kbhit()) {
+			char ch = _getch();
+			if (KEY_UP(ch)) {
+				gemeControl(UP);
+
+			}
+			else if (KEY_DOWN(ch)) {
+				gemeControl(DOWN);
+			}
+			else if (KEY_LEFT(ch)) {
+				gemeControl(LEFT);
+			}
+			else if (KEY_RIGHT(ch)) {
+				gemeControl(RIGTH);
+			}
+			else if (KEY_QUIT(ch)) {
+				quit = true;
+				GameOverScene(&sbg_img);
+			}
+			if (ISGameOver()) {
+				quit = true;
+				GameOverScene(&vbg_img);
+			}
+		}
+		Sleep(100);
+	} while (quit == false);
+
+}
+void InitGame() {
+	//渲染背景
+	IMAGE bg_img;
+	initgraph(SCREEN_WIDTH, SCREEN_HEIGHT);
+	loadimage(&bg_img, _T("blackground.bmp"), SCREEN_WIDTH, SCREEN_HEIGHT, true);
+	putimage(0, 0, &bg_img);
+
+	//播放背景音乐
+	mciSendString(_T("play Push_Box.mp3 repeat"), 0, 0, 0);
+
+	// 渲染胜利背景
+	loadimage(&vbg_img, _T("victory.jpg"), SCREEN_WIDTH, SCREEN_HEIGHT, true);
+
+	// 渲染失败背景
+	loadimage(&sbg_img, _T("sorry.jpg"), SCREEN_WIDTH, SCREEN_HEIGHT, true);
+
+	//加载道具图标
+	loadimage(&images[0], _T("wall_right.bmp"), RATIO, RATIO, true);
+	loadimage(&images[1], _T("floor.bmp"), RATIO, RATIO, true);
+	loadimage(&images[2], _T("des.bmp"), RATIO, RATIO, true);
+	loadimage(&images[3], _T("man.bmp"), RATIO, RATIO, true);
+	loadimage(&images[4], _T("box.bmp"), RATIO, RATIO, true);
+	loadimage(&images[5], _T("box.bmp"), RATIO, RATIO, true);
+	for (int i = 0; i < LINE; i++) {
+		for (int j = 0; j < COLUMN; j++) {
+			if (map[i][j] == MAN) {
+				man.x = i;
+				man.y = j;
+			}
+			putimage(START_X + j * RATIO, START_Y + i * RATIO, &images[map[i][j]]);
+		}
+	}
+}
+	
+int main(){
+	
+	InitGame();
+	StartGame();
+
+	system("pause");
+	closegraph();
+	return 0;
+}
